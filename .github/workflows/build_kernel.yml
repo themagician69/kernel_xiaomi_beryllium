@@ -2,12 +2,6 @@ name: Build Etude-KSU Kernel
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - 15.0
-  pull_request:
-    branches:
-      - 15.0
 
 jobs:
   build:
