@@ -41,7 +41,7 @@ ARCH="arm64"
 SUBARCH="arm64"
 DEFCONFIG=beryllium_defconfig
 COMPILER=clang
-LINKER=""
+LINKER="lld"  # FIXED: Set to lld so Build_lld() is triggered properly
 KERNEL_DIR="$(pwd)"
 COMPILERDIR="${KERNEL_DIR}/clang"
 
@@ -118,9 +118,7 @@ with open(file_path, "r") as f:
 
 new_lines = []
 for line in lines:
-    # If line invokes security_context_to_sid with 4 args and lacks selinux_state
     if "security_context_to_sid(" in line and "selinux_state" not in line:
-        # Insert &selinux_state, as the first argument inside the parenthesis
         line = line.replace("security_context_to_sid(", "security_context_to_sid(&selinux_state, ")
     new_lines.append(line)
 
@@ -134,20 +132,18 @@ else
     exit 1
 fi
 
-
-
 # Make defconfig
-
 make O=out ARCH=${ARCH} ${DEFCONFIG}
 if [ $? -ne 0 ]
 then
-    echo "Build failed"
+    echo "Defconfig failed"
+    exit 1
 else
     echo "Made ${DEFCONFIG}"
 fi
 
-# Build starts here
-if [ -z ${LINKER} ]
+# Build starts here (Will now properly route to Build_lld because LINKER="lld")
+if [ -z "${LINKER}" ]
 then
     Build
 else
@@ -157,12 +153,13 @@ fi
 if [ $? -ne 0 ]
 then
     echo "Build failed"
+    exit 1
 else
-    echo "Build succesful"
+    echo "Build successful"
 fi
 
 ##----------------------------------------------------------------##
-function zipping() {
+zipping() {
 	# Copy Files To AnyKernel3 Zip
 	cp $IMAGE AnyKernel3
 	
@@ -171,13 +168,11 @@ function zipping() {
         zip -r9 ${FINAL_ZIP} *
         MD5CHECK=$(md5sum "$FINAL_ZIP" | cut -d' ' -f1)
         cd ..
-        }
+}
 ##----------------------------------------------------------##
 
-Build
 END=$(date +"%s")
 zipping
-
 
 BUILD_END=$(date +"%s")
 DIFF=$(($BUILD_END - $BUILD_START))
