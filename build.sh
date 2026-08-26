@@ -31,44 +31,6 @@ else
     echo "Warning: syscall_hook_patches.sh not found in root directory!"
 fi
 
-## --- MULTILINE PYTHON SELINUX_HIDE FIX ---
-SELINUX_HIDE_FILE=$(find . -name "selinux_hide.c" -path "*/drivers/kernelsu/*")
-if [ -f "$SELINUX_HIDE_FILE" ]; then
-    echo "Running multiline regex Python patch on $SELINUX_HIDE_FILE..."
-    
-    python3 -c '
-import re
-
-file_path = "'"$SELINUX_HIDE_FILE"'"
-with open(file_path, "r") as f:
-    content = f.read()
-
-# Pattern to match security_context_to_sid followed by anything up to the opening parenthesis,
-# ensuring we do not inject selinux_state if it is already there.
-pattern = r"security_context_to_sid\s*\(\s*(?!&selinux_state)"
-
-# Replacement adds &selinux_state, as the first argument
-replacement = "security_context_to_sid(&selinux_state, "
-
-new_content, count = re.subn(pattern, replacement, content)
-
-if count > 0:
-    with open(file_path, "w") as f:
-        f.write(new_content)
-    print(f"Successfully patched {count} instance(s) using regex!")
-else:
-    print("Warning: No matching security_context_to_sid call found or already patched!")
-'
-
-    echo "Checking patched lines:"
-    grep -n "security_context_to_sid" "$SELINUX_HIDE_FILE"
-else
-    echo "Warning: selinux_hide.c not found!"
-fi
-
-
-
-
 # Clang
 echo "Using Prelude-Clang"
 git clone -b master https://gitlab.com/jjpprrrr/prelude-clang.git --depth=1 clang
@@ -142,6 +104,34 @@ STRIP=llvm-strip \
 ld-name=${LINKER} \
 KBUILD_COMPILER_STRING="Prelude Clang"
 }
+# --- ENSURE SELINUX_HIDE IS PATCHED RIGHT BEFORE COMPILE ---
+SELINUX_HIDE_FILE=$(find . -name "selinux_hide.c" -path "*/drivers/kernelsu/*")
+if [ -f "$SELINUX_HIDE_FILE" ]; then
+    echo "Found selinux_hide.c. Applying 5-argument patch for Kernel 4.9..."
+    
+    python3 -c '
+file_path = "'"$SELINUX_HIDE_FILE"'"
+with open(file_path, "r") as f:
+    content = f.read()
+
+# Replace the 4-arg calls with the 5-arg version containing &selinux_state
+content = content.replace(
+    "security_context_to_sid(\"u:r:ksu:s0\"", 
+    "security_context_to_sid(&selinux_state, \"u:r:ksu:s0\""
+)
+content = content.replace(
+    "security_context_to_sid(\"u:r:priv_app:s0", 
+    "security_context_to_sid(&selinux_state, \"u:r:priv_app:s0"
+)
+
+with open(file_path, "w") as f:
+    f.write(content)
+
+print("Patch applied successfully right before compilation!")
+'
+else
+    echo "Error: selinux_hide.c still not found at compile time!"
+fi
 
 # Make defconfig
 
