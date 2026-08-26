@@ -104,33 +104,36 @@ STRIP=llvm-strip \
 ld-name=${LINKER} \
 KBUILD_COMPILER_STRING="Prelude Clang"
 }
-# --- ENSURE SELINUX_HIDE IS PATCHED RIGHT BEFORE COMPILE ---
-SELINUX_HIDE_FILE=$(find . -name "selinux_hide.c" -path "*/drivers/kernelsu/*")
+
+# --- DIRECT PATH SELINUX_HIDE PATCH FOR KERNEL 4.9 ---
+echo "Searching for selinux_hide.c across the whole source tree..."
+SELINUX_HIDE_FILE=$(find . -name "selinux_hide.c")
+
 if [ -f "$SELINUX_HIDE_FILE" ]; then
-    echo "Found selinux_hide.c. Applying 5-argument patch for Kernel 4.9..."
+    echo "Found selinux_hide.c at: $SELINUX_HIDE_FILE"
+    echo "Applying 5-argument patch for Kernel 4.9..."
     
     python3 -c '
 file_path = "'"$SELINUX_HIDE_FILE"'"
 with open(file_path, "r") as f:
     content = f.read()
 
-# Replace the 4-arg calls with the 5-arg version containing &selinux_state
-content = content.replace(
-    "security_context_to_sid(\"u:r:ksu:s0\"", 
-    "security_context_to_sid(&selinux_state, \"u:r:ksu:s0\""
-)
-content = content.replace(
-    "security_context_to_sid(\"u:r:priv_app:s0", 
-    "security_context_to_sid(&selinux_state, \"u:r:priv_app:s0"
-)
+# Replace all occurrences of security_context_to_sid with the 5-argument version
+# We handle both formats by matching the function call directly
+old_target = "security_context_to_sid("
+new_target = "security_context_to_sid(&selinux_state, "
 
-with open(file_path, "w") as f:
-    f.write(content)
-
-print("Patch applied successfully right before compilation!")
+if "&selinux_state" not in content:
+    content = content.replace(old_target, new_target)
+    with open(file_path, "w") as f:
+        f.write(content)
+    print("Successfully injected &selinux_state into selinux_hide.c!")
+else:
+    print("&selinux_state is already present in the file.")
 '
 else
-    echo "Error: selinux_hide.c still not found at compile time!"
+    echo "CRITICAL: selinux_hide.c could not be found anywhere!"
+    exit 1
 fi
 
 # Make defconfig
