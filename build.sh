@@ -31,30 +31,33 @@ else
     echo "Warning: syscall_hook_patches.sh not found in root directory!"
 fi
 
-# --- UNIVERSAL PYTHON SELINUX_HIDE FIX ---
+## --- MULTILINE PYTHON SELINUX_HIDE FIX ---
 SELINUX_HIDE_FILE=$(find . -name "selinux_hide.c" -path "*/drivers/kernelsu/*")
 if [ -f "$SELINUX_HIDE_FILE" ]; then
-    echo "Running universal Python patch on $SELINUX_HIDE_FILE..."
+    echo "Running multiline regex Python patch on $SELINUX_HIDE_FILE..."
     
     python3 -c '
+import re
+
 file_path = "'"$SELINUX_HIDE_FILE"'"
 with open(file_path, "r") as f:
-    lines = f.readlines()
+    content = f.read()
 
-new_lines = []
-patched_count = 0
-for line in lines:
-    # If the line calls security_context_to_sid and does NOT already have selinux_state
-    if "security_context_to_sid(" in line and "selinux_state" not in line:
-        # Insert &selinux_state, right after the opening parenthesis
-        line = line.replace("security_context_to_sid(", "security_context_to_sid(&selinux_state, ")
-        patched_count += 1
-    new_lines.append(line)
+# Pattern to match security_context_to_sid followed by anything up to the opening parenthesis,
+# ensuring we do not inject selinux_state if it is already there.
+pattern = r"security_context_to_sid\s*\(\s*(?!&selinux_state)"
 
-with open(file_path, "w") as f:
-    f.writelines(new_lines)
+# Replacement adds &selinux_state, as the first argument
+replacement = "security_context_to_sid(&selinux_state, "
 
-print(f"Successfully patched {patched_count} instance(s) of security_context_to_sid!")
+new_content, count = re.subn(pattern, replacement, content)
+
+if count > 0:
+    with open(file_path, "w") as f:
+        f.write(new_content)
+    print(f"Successfully patched {count} instance(s) using regex!")
+else:
+    print("Warning: No matching security_context_to_sid call found or already patched!")
 '
 
     echo "Checking patched lines:"
@@ -62,6 +65,7 @@ print(f"Successfully patched {patched_count} instance(s) of security_context_to_
 else
     echo "Warning: selinux_hide.c not found!"
 fi
+
 
 
 
