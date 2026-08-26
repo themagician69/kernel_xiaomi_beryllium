@@ -11,6 +11,18 @@ export LLVM=1
 # KernelSU-Next
 curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s legacy
 
+# --- APPLY FIX HERE ---
+echo "Applying KernelSU-Next commit fix..."
+# Find the kernelSU folder name (usually drivers/kernelsu)
+KSU_PATH=$(find . -maxdepth 3 -type d -name "kernelsu")
+if [ -d "$KSU_PATH" ]; then
+    cd "$KSU_PATH"
+    git fetch https://github.com/KernelSU-Next/KernelSU-Next.git cfd00daefb846a525fee64dc884b64759c3d0424
+    git cherry-pick cfd00daefb846a525fee64dc884b64759c3d0424 || true
+    cd -
+fi
+# ----------------------
+
 # Hook pacthing
 bash syscall_hook_patches.sh
 
