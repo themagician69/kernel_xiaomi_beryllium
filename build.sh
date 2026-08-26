@@ -31,20 +31,18 @@ else
     echo "Warning: syscall_hook_patches.sh not found in root directory!"
 fi
 
-# --- FOOLPROOF SELINUX_HIDE FIX WITH CLEANUP ---
+# --- ULTIMATE SELINUX_HIDE OVERRIDE FIX ---
 SELINUX_HIDE_FILE=$(find . -name "selinux_hide.c" -path "*/drivers/kernelsu/*")
 if [ -f "$SELINUX_HIDE_FILE" ]; then
-    echo "Cleaning any previous edits on selinux_hide.c..."
-    # Discard any local modifications to this specific file to start fresh
-    git -C "$(dirname "$SELINUX_HIDE_FILE")" checkout selinux_hide.c 2>/dev/null || true
-
-    echo "Patching security_context_to_sid via string matching in $SELINUX_HIDE_FILE..."
+    echo "Overriding security_context_to_sid calls in $SELINUX_HIDE_FILE..."
     
-    # Apply the clean 5-argument transformation
-    sed -i 's/security_context_to_sid("u:r:ksu:s0"/security_context_to_sid(\&selinux_state, "u:r:ksu:s0"/g' "$SELINUX_HIDE_FILE"
-    sed -i 's/security_context_to_sid("u:r:priv_app:s0/security_context_to_sid(\&selinux_state, "u:r:priv_app:s0/g' "$SELINUX_HIDE_FILE"
+    # Replace the entire line for err1
+    sed -i 's/int err1 = security_context_to_sid(.*/int err1 = security_context_to_sid(\&selinux_state, "u:r:ksu:s0", strlen("u:r:ksu:s0"), \&ksu_sid, GFP_KERNEL);/g' "$SELINUX_HIDE_FILE"
     
-    echo "Checking modified lines in selinux_hide.c:"
+    # Replace the entire line for priv_app_sid (or whatever variable follows)
+    sed -i 's/.*security_context_to_sid.*priv_app_sid.*/    int err2 = security_context_to_sid(\&selinux_state, "u:r:priv_app:s0:c512,c768", strlen("u:r:priv_app:s0:c512,c768"), \&priv_app_sid, GFP_KERNEL);/g' "$SELINux_HIDE_FILE"
+    
+    echo "Check final state of lines:"
     grep -n "security_context_to_sid" "$SELINUX_HIDE_FILE"
 else
     echo "Warning: selinux_hide.c not found!"
