@@ -142,21 +142,22 @@ else
     echo "Made ${DEFCONFIG}"
 fi
 
-# Build starts here (Will now properly route to Build_lld because LINKER="lld")
-if [ -z "${LINKER}" ]
-then
-    Build
-else
-    Build_lld
-fi
-
-if [ $? -ne 0 ]
-then
-    echo "Build failed"
-    exit 1
-else
-    echo "Build successful"
-fi
+# Force direct execution of Build_lld to test
+echo "Forcing Build_lld execution..."
+PATH="${COMPILERDIR}/bin:${PATH}" \
+make -j$(nproc --all) O=out \
+ARCH=${ARCH} \
+CC=${COMPILER} \
+CROSS_COMPILE=${COMPILERDIR}/bin/aarch64-linux-gnu- \
+CROSS_COMPILE_ARM32=${COMPILERDIR}/bin/arm-linux-gnueabi- \
+LD=ld.lld \
+AR=llvm-ar \
+NM=llvm-nm \
+OBJCOPY=llvm-objcopy \
+OBJDUMP=llvm-objdump \
+STRIP=llvm-strip \
+ld-name=lld \
+KBUILD_COMPILER_STRING="Prelude Clang"
 
 ##----------------------------------------------------------------##
 zipping() {
