@@ -31,28 +31,30 @@ else
     echo "Warning: syscall_hook_patches.sh not found in root directory!"
 fi
 
-# --- ROBUST PYTHON SELINUX_HIDE FIX ---
+# --- UNIVERSAL PYTHON SELINUX_HIDE FIX ---
 SELINUX_HIDE_FILE=$(find . -name "selinux_hide.c" -path "*/drivers/kernelsu/*")
 if [ -f "$SELINUX_HIDE_FILE" ]; then
-    echo "Using Python to patch security_context_to_sid in $SELINUX_HIDE_FILE..."
+    echo "Running universal Python patch on $SELINUX_HIDE_FILE..."
     
     python3 -c '
 file_path = "'"$SELINUX_HIDE_FILE"'"
 with open(file_path, "r") as f:
-    content = f.read()
+    lines = f.readlines()
 
-# Replace the 4-argument security_context_to_sid calls with the 5-argument version containing &selinux_state
-# We target the function name and insert &selinux_state, as the first parameter
-old_call = "security_context_to_sid(\"u:r:"
-new_call = "security_context_to_sid(&selinux_state, \"u:r:"
+new_lines = []
+patched_count = 0
+for line in lines:
+    # If the line calls security_context_to_sid and does NOT already have selinux_state
+    if "security_context_to_sid(" in line and "selinux_state" not in line:
+        # Insert &selinux_state, right after the opening parenthesis
+        line = line.replace("security_context_to_sid(", "security_context_to_sid(&selinux_state, ")
+        patched_count += 1
+    new_lines.append(line)
 
-if old_call in content:
-    content = content.replace(old_call, new_call)
-    with open(file_path, "w") as f:
-        f.write(content)
-    print("Successfully patched security_context_to_sid calls using Python!")
-else:
-    print("Warning: Target string not found for patching!")
+with open(file_path, "w") as f:
+    f.writelines(new_lines)
+
+print(f"Successfully patched {patched_count} instance(s) of security_context_to_sid!")
 '
 
     echo "Checking patched lines:"
