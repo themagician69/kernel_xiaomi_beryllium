@@ -31,13 +31,18 @@ else
     echo "Warning: syscall_hook_patches.sh not found in root directory!"
 fi
 
-# --- AUTOMATE SELINUX_HIDE FIX (sed patch) ---
-SELINUX_HIDE_FILE=$(find . -path "*/drivers/kernelsu/feature/selinux_hide.c")
+# --- AUTOMATE SELINUX_HIDE FIX ---
+SELINUX_HIDE_FILE=$(find . -name "selinux_hide.c" -path "*/drivers/kernelsu/*")
 if [ -f "$SELINUX_HIDE_FILE" ]; then
-    echo "Patching security_context_to_sid arguments in selinux_hide.c..."
+    echo "Patching security_context_to_sid in $SELINUX_HIDE_FILE..."
+    # Explicitly target lines containing security_context_to_sid and add &selinux_state,
     sed -i 's/security_context_to_sid(/security_context_to_sid(\&selinux_state, /g' "$SELINUX_HIDE_FILE"
+    
+    # Verify the patch was applied
+    echo "Checking patched lines:"
+    grep -n "security_context_to_sid" "$SELINUX_HIDE_FILE"
 else
-    echo "selinux_hide.c not found, skipping patch."
+    echo "Warning: selinux_hide.c not found!"
 fi
 
 # Clang
@@ -67,7 +72,7 @@ IMAGE=$(pwd)/out/arch/arm64/boot/Image.gz-dtb
 
 # Clone AnyKernel
 echo "Cloning AnyKernel3"
-git clone --depth=1 https://github.com/Legendleo90/AnyKernel3.git -b etude AnyKernel3
+git clone --depth=1 https://github.com/Legendleo90/AnyKernel3.git AnyKernel3
 
 # Create Logs
 exec 2> >(tee -a out/error.log >&2)
