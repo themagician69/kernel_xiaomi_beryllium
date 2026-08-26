@@ -105,33 +105,35 @@ ld-name=${LINKER} \
 KBUILD_COMPILER_STRING="Prelude Clang"
 }
 
-# --- DIRECT PATH SELINUX_HIDE PATCH FOR KERNEL 4.9 ---
-echo "Searching for selinux_hide.c across the whole source tree..."
-# --- ABSOLUTE PATH DIRECT FIX FOR SELINUX_HIDE.C ---
+# --- FINAL FIX FOR SELINUX_HIDE.C ON KERNEL 4.9 ---
 TARGET_FILE="drivers/kernelsu/feature/selinux_hide.c"
 
 if [ -f "$TARGET_FILE" ]; then
-    echo "Found $TARGET_FILE. Applying direct Python injection..."
+    echo "Patching security_context_to_sid in $TARGET_FILE for Kernel 4.9..."
     
     python3 -c '
 file_path = "drivers/kernelsu/feature/selinux_hide.c"
 with open(file_path, "r") as f:
-    content = f.read()
+    lines = f.readlines()
 
-# Replace security_context_to_sid calls to include &selinux_state as the first argument
-if "&selinux_state" not in content:
-    # Target line 47 and 49 style calls precisely
-    content = content.replace("security_context_to_sid(", "security_context_to_sid(&selinux_state, ")
-    with open(file_path, "w") as f:
-        f.write(content)
-    print("Successfully patched security_context_to_sid with &selinux_state!")
-else:
-    print("Already patched.")
+new_lines = []
+for line in lines:
+    # If line invokes security_context_to_sid with 4 args and lacks selinux_state
+    if "security_context_to_sid(" in line and "selinux_state" not in line:
+        # Insert &selinux_state, as the first argument inside the parenthesis
+        line = line.replace("security_context_to_sid(", "security_context_to_sid(&selinux_state, ")
+    new_lines.append(line)
+
+with open(file_path, "w") as f:
+    f.writelines(new_lines)
+
+print("Successfully injected &selinux_state into security_context_to_sid calls.")
 '
 else
-    echo "Error: Could not locate $TARGET_FILE directly."
+    echo "Error: $TARGET_FILE not found!"
     exit 1
 fi
+
 
 
 # Make defconfig
