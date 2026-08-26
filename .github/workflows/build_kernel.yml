@@ -1,0 +1,31 @@
+name: Build Etude-KSU Kernel
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 15.0
+  pull_request:
+    branches:
+      - 15.0
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive # Good practice if your kernel source uses submodules
+
+      - name: Start Kernel Build
+        run: bash build.sh
+        env:
+          DEVICE: "PocoF1"
+
+      - name: Upload Kernel Zip Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Etude-KSU-Next-Beryllium
+          path: AnyKernel3/*.zip
