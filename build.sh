@@ -11,20 +11,34 @@ export LLVM=1
 # KernelSU-Next
 curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s legacy
 
-# --- APPLY FIX HERE ---
+# --- APPLY FIX HERE (KernelSU commit fix) ---
 echo "Applying KernelSU-Next commit fix..."
-# Find the kernelSU folder name (usually drivers/kernelsu)
 KSU_PATH=$(find . -maxdepth 3 -type d -name "kernelsu")
 if [ -d "$KSU_PATH" ]; then
     cd "$KSU_PATH"
     git fetch https://github.com/KernelSU-Next/KernelSU-Next.git cfd00daefb846a525fee64dc884b64759c3d0424
     git cherry-pick cfd00daefb846a525fee64dc884b64759c3d0424 || true
     cd -
+else
+    echo "Warning: KernelSU directory not found for patching!"
 fi
-# ----------------------
 
-# Hook pacthing
-bash syscall_hook_patches.sh
+# --- HOOK PATCHING ---
+if [ -f "syscall_hook_patches.sh" ]; then
+    echo "Running syscall hook patches..."
+    bash syscall_hook_patches.sh
+else
+    echo "Warning: syscall_hook_patches.sh not found in root directory!"
+fi
+
+# --- AUTOMATE SELINUX_HIDE FIX (sed patch) ---
+SELINUX_HIDE_FILE=$(find . -path "*/drivers/kernelsu/feature/selinux_hide.c")
+if [ -f "$SELINUX_HIDE_FILE" ]; then
+    echo "Patching security_context_to_sid arguments in selinux_hide.c..."
+    sed -i 's/security_context_to_sid(/security_context_to_sid(\&selinux_state, /g' "$SELINUX_HIDE_FILE"
+else
+    echo "selinux_hide.c not found, skipping patch."
+fi
 
 # Clang
 echo "Using Prelude-Clang"
@@ -35,7 +49,6 @@ KERNELNAME="Etude-Op.13-No.2-KSU-Next"
 ARCH="arm64"
 SUBARCH="arm64"
 DEFCONFIG=beryllium_defconfig
-#DEFCONFIG=beryllium_defconfig
 COMPILER=clang
 LINKER=""
 KERNEL_DIR="$(pwd)"
@@ -54,7 +67,7 @@ IMAGE=$(pwd)/out/arch/arm64/boot/Image.gz-dtb
 
 # Clone AnyKernel
 echo "Cloning AnyKernel3"
-git clone --depth=1 https://github.com/Legendleo90/AnyKernel3.git AnyKernel3
+git clone --depth=1 https://github.com/Legendleo90/AnyKernel3.git -b etude AnyKernel3
 
 # Create Logs
 exec 2> >(tee -a out/error.log >&2)
