@@ -39,7 +39,7 @@ IMAGE=$(pwd)/out/arch/arm64/boot/Image.gz-dtb
 
 # Clone AnyKernel
 echo "Cloning AnyKernel3"
-git clone --depth=1 https://github.com/Legendleo90/AnyKernel3.git -b etude AnyKernel3
+git clone --depth=1 https://github.com/Legendleo90/AnyKernel3.git AnyKernel3
 
 # Create Logs
 exec 2> >(tee -a out/error.log >&2)
