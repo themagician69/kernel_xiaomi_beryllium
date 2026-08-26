@@ -11,6 +11,9 @@ export LLVM=1
 # KernelSU-Next
 curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s legacy
 
+# Hook pacthing
+bash syscall_hook_patches.sh
+
 # Clang
 echo "Using Prelude-Clang"
 git clone -b master https://gitlab.com/jjpprrrr/prelude-clang.git --depth=1 clang
