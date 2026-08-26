@@ -31,20 +31,21 @@ else
     echo "Warning: syscall_hook_patches.sh not found in root directory!"
 fi
 
-# # --- AUTOMATE SELINUX_HIDE FIX FOR KERNEL 4.9 ---
+# --- AUTOMATE SELINUX_HIDE FIX (5-argument version for this 4.9 source) ---
 SELINUX_HIDE_FILE=$(find . -name "selinux_hide.c" -path "*/drivers/kernelsu/*")
 if [ -f "$SELINUX_HIDE_FILE" ]; then
-    echo "Adapting selinux_hide.c for Kernel 4.9..."
+    echo "Patching security_context_to_sid to include &selinux_state in $SELINUX_HIDE_FILE..."
     
-    # Kernel 4.9 security_context_to_sid only takes 4 arguments. 
-    # If sed previously added &selinux_state, let's revert it or fix it back to 4 args:
-    sed -i 's/security_context_to_sid(\&selinux_state, /security_context_to_sid(/g' "$SELINUX_HIDE_FILE"
+    # Safely replace security_context_to_sid( with security_context_to_sid(&selinux_state, 
+    # First, strip any accidental double-injections if they exist, then apply cleanly:
+    sed -i 's/security_context_to_sid(&selinux_state, /security_context_to_sid(/g' "$SELINUX_HIDE_FILE"
+    sed -i 's/security_context_to_sid(/security_context_to_sid(\&selinux_state, /g' "$SELINUX_HIDE_FILE"
     
-    echo "Patched selinux_hide.c successfully."
+    echo "Verification of patched lines:"
+    grep -n "security_context_to_sid" "$SELINUX_HIDE_FILE"
 else
     echo "Warning: selinux_hide.c not found!"
 fi
-
 
 # Clang
 echo "Using Prelude-Clang"
