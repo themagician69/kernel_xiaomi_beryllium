@@ -31,21 +31,25 @@ else
     echo "Warning: syscall_hook_patches.sh not found in root directory!"
 fi
 
-# --- AUTOMATE SELINUX_HIDE FIX (5-argument version for this 4.9 source) ---
+# --- FOOLPROOF SELINUX_HIDE FIX WITH CLEANUP ---
 SELINUX_HIDE_FILE=$(find . -name "selinux_hide.c" -path "*/drivers/kernelsu/*")
 if [ -f "$SELINUX_HIDE_FILE" ]; then
-    echo "Patching security_context_to_sid to include &selinux_state in $SELINUX_HIDE_FILE..."
+    echo "Cleaning any previous edits on selinux_hide.c..."
+    # Discard any local modifications to this specific file to start fresh
+    git -C "$(dirname "$SELINUX_HIDE_FILE")" checkout selinux_hide.c 2>/dev/null || true
+
+    echo "Patching security_context_to_sid via string matching in $SELINUX_HIDE_FILE..."
     
-    # Safely replace security_context_to_sid( with security_context_to_sid(&selinux_state, 
-    # First, strip any accidental double-injections if they exist, then apply cleanly:
-    sed -i 's/security_context_to_sid(&selinux_state, /security_context_to_sid(/g' "$SELINUX_HIDE_FILE"
-    sed -i 's/security_context_to_sid(/security_context_to_sid(\&selinux_state, /g' "$SELINUX_HIDE_FILE"
+    # Apply the clean 5-argument transformation
+    sed -i 's/security_context_to_sid("u:r:ksu:s0"/security_context_to_sid(\&selinux_state, "u:r:ksu:s0"/g' "$SELINUX_HIDE_FILE"
+    sed -i 's/security_context_to_sid("u:r:priv_app:s0/security_context_to_sid(\&selinux_state, "u:r:priv_app:s0/g' "$SELINUX_HIDE_FILE"
     
-    echo "Verification of patched lines:"
+    echo "Checking modified lines in selinux_hide.c:"
     grep -n "security_context_to_sid" "$SELINUX_HIDE_FILE"
 else
     echo "Warning: selinux_hide.c not found!"
 fi
+
 
 # Clang
 echo "Using Prelude-Clang"
