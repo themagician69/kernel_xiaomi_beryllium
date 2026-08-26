@@ -31,22 +31,36 @@ else
     echo "Warning: syscall_hook_patches.sh not found in root directory!"
 fi
 
-# --- ULTIMATE SELINUX_HIDE OVERRIDE FIX ---
+# --- ROBUST PYTHON SELINUX_HIDE FIX ---
 SELINUX_HIDE_FILE=$(find . -name "selinux_hide.c" -path "*/drivers/kernelsu/*")
 if [ -f "$SELINUX_HIDE_FILE" ]; then
-    echo "Overriding security_context_to_sid calls in $SELINUX_HIDE_FILE..."
+    echo "Using Python to patch security_context_to_sid in $SELINUX_HIDE_FILE..."
     
-    # Replace the entire line for err1
-    sed -i 's/int err1 = security_context_to_sid(.*/int err1 = security_context_to_sid(\&selinux_state, "u:r:ksu:s0", strlen("u:r:ksu:s0"), \&ksu_sid, GFP_KERNEL);/g' "$SELINUX_HIDE_FILE"
-    
-    # Replace the entire line for priv_app_sid (or whatever variable follows)
-    sed -i 's/.*security_context_to_sid.*priv_app_sid.*/    int err2 = security_context_to_sid(\&selinux_state, "u:r:priv_app:s0:c512,c768", strlen("u:r:priv_app:s0:c512,c768"), \&priv_app_sid, GFP_KERNEL);/g' "$SELINux_HIDE_FILE"
-    
-    echo "Check final state of lines:"
+    python3 -c '
+file_path = "'"$SELINUX_HIDE_FILE"'"
+with open(file_path, "r") as f:
+    content = f.read()
+
+# Replace the 4-argument security_context_to_sid calls with the 5-argument version containing &selinux_state
+# We target the function name and insert &selinux_state, as the first parameter
+old_call = "security_context_to_sid(\"u:r:"
+new_call = "security_context_to_sid(&selinux_state, \"u:r:"
+
+if old_call in content:
+    content = content.replace(old_call, new_call)
+    with open(file_path, "w") as f:
+        f.write(content)
+    print("Successfully patched security_context_to_sid calls using Python!")
+else:
+    print("Warning: Target string not found for patching!")
+'
+
+    echo "Checking patched lines:"
     grep -n "security_context_to_sid" "$SELINUX_HIDE_FILE"
 else
     echo "Warning: selinux_hide.c not found!"
 fi
+
 
 
 # Clang
