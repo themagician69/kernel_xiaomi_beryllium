@@ -11,7 +11,21 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive # Good practice if your kernel source uses submodules
+          submodules: recursive
+
+      - name: Update F2FS from LineageOS Upstream
+        run: |
+          echo "Cloning LineageOS sdm845 kernel (lineage-22.2)..."
+          git clone --depth=1 https://github.com/LineageOS/android_kernel_xiaomi_sdm845.git -b lineage-22.2 temp_lineage_kernel
+          
+          echo "Replacing local fs/f2fs with the updated version..."
+          rm -rf fs/f2fs
+          mkdir -p fs/f2fs
+          cp -r temp_lineage_kernel/fs/f2fs/* fs/f2fs/
+          
+          # Clean up the temporary clone
+          rm -rf temp_lineage_kernel
+          echo "F2FS replacement completed successfully!"
 
       - name: Start Kernel Build
         run: bash build.sh
