@@ -20,11 +20,13 @@ KERNELNAME="Etude-Op.13-No.2-KSU-Next"
 ARCH="arm64"
 SUBARCH="arm64"
 DEFCONFIG=beryllium_defconfig
-#DEFCONFIG=beryllium_defconfig
 COMPILER=clang
 LINKER=""
 KERNEL_DIR="$(pwd)"
 COMPILERDIR="${KERNEL_DIR}/clang"
+
+# Make sure out/ exists early so logging doesn't fail
+mkdir -p out
 
 # Export shits
 export KBUILD_BUILD_USER=NotDheeraj06
@@ -41,7 +43,7 @@ IMAGE=$(pwd)/out/arch/arm64/boot/Image.gz-dtb
 echo "Cloning AnyKernel3"
 git clone --depth=1 https://github.com/Legendleo90/AnyKernel3.git AnyKernel3
 
-# Create Logs
+# Create Logs (now safe because out/ exists)
 exec 2> >(tee -a out/error.log >&2)
 
 # Specify Final Zip Name
@@ -51,7 +53,7 @@ FINAL_ZIP=${ZIPNAME}-${DEVICE}.zip
 # Speed up build process
 MAKE="./makeparallel"
 
-# Basic build function
+# Colors
 BUILD_START=$(date +"%s")
 blue='\033[0;34m'
 cyan='\033[0;36m'
@@ -59,23 +61,24 @@ yellow='\033[0;33m'
 red='\033[0;31m'
 nocol='\033[0m'
 
+# Ensure Clang bin is globally available in PATH for all make commands
+export PATH="${COMPILERDIR}/bin:${PATH}"
+
 Build () {
-PATH="${COMPILERDIR}/bin:${PATH}" \
 make -j$(nproc --all) O=out \
 ARCH=${ARCH} \
 CC=${COMPILER} \
-CROSS_COMPILE=${COMPILERDIR}/bin/aarch64-linux-gnu- \
-CROSS_COMPILE_ARM32=${COMPILERDIR}/bin/arm-linux-gnueabi- \
+CROSS_COMPILE=aarch64-linux-gnu- \
+CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
 LD_LIBRARY_PATH=${COMPILERDIR}/lib
 }
 
 Build_lld () {
-PATH="${COMPILERDIR}/bin:${PATH}" \
 make -j$(nproc --all) O=out \
 ARCH=${ARCH} \
 CC=${COMPILER} \
-CROSS_COMPILE=${COMPILERDIR}/bin/aarch64-linux-gnu- \
-CROSS_COMPILE_ARM32=${COMPILERDIR}/bin/arm-linux-gnueabi- \
+CROSS_COMPILE=aarch64-linux-gnu- \
+CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
 LD=ld.${LINKER} \
 AR=llvm-ar \
 NM=llvm-nm \
@@ -87,17 +90,19 @@ KBUILD_COMPILER_STRING="Prelude Clang"
 }
 
 # Make defconfig
-
+echo "Making ${DEFCONFIG}..."
 make O=out ARCH=${ARCH} ${DEFCONFIG}
 if [ $? -ne 0 ]
 then
-    echo "Build failed"
+    echo "Defconfig failed"
+    exit 1
 else
     echo "Made ${DEFCONFIG}"
 fi
 
 # Build starts here
-if [ -z ${LINKER} ]
+echo "Starting compilation..."
+if [ -z "${LINKER}" ]
 then
     Build
 else
@@ -107,27 +112,26 @@ fi
 if [ $? -ne 0 ]
 then
     echo "Build failed"
+    exit 1
 else
-    echo "Build succesful"
+    echo "Build successful"
 fi
 
 ##----------------------------------------------------------------##
-function zipping() {
+zipping() {
 	# Copy Files To AnyKernel3 Zip
-	cp $IMAGE AnyKernel3
+	cp $IMAGE AnyKernel3/
 	
-	# Zipping and Push Kernel
+	# Zipping Kernel
 	cd AnyKernel3 || exit 1
-        zip -r9 ${FINAL_ZIP} *
-        MD5CHECK=$(md5sum "$FINAL_ZIP" | cut -d' ' -f1)
-        cd ..
-        }
+    zip -r9 ${FINAL_ZIP} *
+    MD5CHECK=$(md5sum "$FINAL_ZIP" | cut -d' ' -f1)
+    cd ..
+}
 ##----------------------------------------------------------##
 
-Build
-END=$(date +"%s")
+# Run zipping function (Removed the duplicate Build call here!)
 zipping
-
 
 BUILD_END=$(date +"%s")
 DIFF=$(($BUILD_END - $BUILD_START))
