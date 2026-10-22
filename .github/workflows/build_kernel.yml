@@ -1,0 +1,34 @@
+name: Build Etude xxKSU Kernel
+
+on:
+  workflow_dispatch: # Allows manual trigger from the Actions tab
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Checkout Kernel Source
+        uses: actions/checkout@v4
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential libncurses-dev bison flex libssl-dev libelf-dev \
+            bc git wget zip curl rsync cpio python3 make gcc g++
+
+      - name: Make scripts executable
+        run: |
+          chmod +x build.sh
+          chmod +x syscall_hook_patches.sh
+
+      - name: Run Build Script
+        run: ./build.sh
+        shell: bash
+
+      - name: Upload Kernel Zip Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Etude-xxKSU-beryllium
+          path: AnyKernel3/*.zip
