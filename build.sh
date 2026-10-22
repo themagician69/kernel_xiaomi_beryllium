@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 echo -e "*****************************"
 echo -e "**                         **"
@@ -67,7 +67,7 @@ LINKER=""
 KERNEL_DIR="$(pwd)"
 COMPILERDIR="${KERNEL_DIR}/clang"
 
-export KBUILD_BUILD_USER=NotDheeraj06
+export KBUILD_BUILD_USER=Dramoled
 export KBUILD_BUILD_HOST=ArchLinux
 
 DISABLE_LTO=0
@@ -75,7 +75,7 @@ THIN_LTO=1
 
 IMAGE=$(pwd)/out/arch/arm64/boot/Image.gz-dtb
 
-# Clone AnyKernel
+# Clone AnyKernel (electro branch)
 echo "Cloning AnyKernel3"
 git clone --depth=1 https://github.com/Legendleo90/AnyKernel3.git -b electro AnyKernel3
 
@@ -99,4 +99,58 @@ PATH="${COMPILERDIR}/bin:${PATH}" \
 make -j$(nproc --all) O=out \
 ARCH=${ARCH} \
 CC=${COMPILER} \
-CROSS
+CROSS_COMPILE=${COMPILERDIR}/bin/aarch64-linux-gnu- \
+CROSS_COMPILE_ARM32=${COMPILERDIR}/bin/arm-linux-gnueabi- \
+LD=ld.${LINKER} \
+AR=llvm-ar \
+NM=llvm-nm \
+OBJCOPY=llvm-objcopy \
+OBJDUMP=llvm-objdump \
+STRIP=llvm-strip \
+ld-name=${LINKER} \
+KBUILD_COMPILER_STRING="Prelude Clang"
+}
+
+# Ensure CONFIG_KSU is enabled in defconfig before making defconfig
+if ! grep -q "CONFIG_KSU=y" "arch/${ARCH}/configs/${DEFCONFIG}"; then
+    echo "CONFIG_KSU=y" >> "arch/${ARCH}/configs/${DEFCONFIG}"
+    echo "[+] Added CONFIG_KSU=y to ${DEFCONFIG}"
+fi
+
+# Make defconfig
+make O=out ARCH=${ARCH} ${DEFCONFIG}
+if [ $? -ne 0 ]
+then
+    echo "Defconfig failed"
+    exit 1
+fi
+
+# Build
+BUILD_START=$(date +"%s")
+if [ -z ${LINKER} ]
+then
+    Build
+else
+    Build_lld
+fi
+
+if [ $? -ne 0 ]
+then
+    echo "Build failed"
+    exit 1
+else
+    echo "Build successful"
+fi
+
+function zipping() {
+	cp $IMAGE AnyKernel3
+	cd AnyKernel3 || exit 1
+    zip -r9 ${FINAL_ZIP} *
+    cd ..
+}
+
+zipping
+
+BUILD_END=$(date +"%s")
+DIFF=$((BUILD_END - BUILD_START))
+echo -e "Build completed in $((DIFF / 60)) minute(s) and $((DIFF % 60)) seconds."
