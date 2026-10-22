@@ -73,7 +73,7 @@ KERNEL_DIR="$(pwd)"
 COMPILERDIR="${KERNEL_DIR}/clang"
 
 # Export shits
-export KBUILD_BUILD_USER=NotDheeraj06
+export KBUILD_BUILD_USER=Dramoled
 export KBUILD_BUILD_HOST=ArchLinux
 
 # Select LTO variant ( Full LTO by default )
