@@ -8,11 +8,17 @@ echo -e "*****************************"
 
 export LLVM=1
 
-# 1. Clone xxKSU (backslashxx/KernelSU) into drivers/kernelsu
+# 1. Clone xxKSU (backslashxx/KernelSU) using the correct reference method
 echo "Cloning xxKSU (backslashxx/KernelSU)"
-git clone https://github.com/backslashxx/KernelSU.git drivers/kernelsu
+git clone https://github.com/backslashxx/KernelSU.git -b master KernelSU
+ln -sf "../KernelSU/kernel" "drivers/kernelsu"
 
-# 2. Execute Manual / Syscall Hook Patches Script
+# 2. Integrate into drivers/Makefile and drivers/Kconfig if missing
+grep -q "kernelsu" "drivers/Makefile" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> "drivers/Makefile"
+grep -q "source \"drivers/kernelsu/Kconfig\"" "drivers/Kconfig" || sed -i "/endmenu/i\source \"drivers/kernelsu/Kconfig\"" "drivers/Kconfig"
+echo "[+] xxKSU integrated into drivers build system."
+
+# 3. Execute Manual / Syscall Hook Patches Script
 if [ -f "syscall_hook_patches.sh" ]; then
     bash syscall_hook_patches.sh ./
     echo "[+] Executed syscall hook patches successfully."
@@ -21,7 +27,7 @@ else
     exit 1
 fi
 
-# 3. Apply SELinux and static state sed patches for Linux 4.9
+# 4. Apply SELinux and static state sed patches for Linux 4.9
 echo "[+] Applying static state sed patches..."
 KERNEL_VERSION=$(head -n 3 Makefile | grep -E 'VERSION|PATCHLEVEL' | awk '{print $3}' | paste -sd '.')
 FIRST_VERSION=$(echo "$KERNEL_VERSION" | awk -F '.' '{print $1}')
@@ -67,7 +73,7 @@ LINKER=""
 KERNEL_DIR="$(pwd)"
 COMPILERDIR="${KERNEL_DIR}/clang"
 
-export KBUILD_BUILD_USER=Dramoled
+export KBUILD_BUILD_USER=NotDheeraj06
 export KBUILD_BUILD_HOST=ArchLinux
 
 DISABLE_LTO=0
@@ -111,10 +117,16 @@ ld-name=${LINKER} \
 KBUILD_COMPILER_STRING="Prelude Clang"
 }
 
-# Ensure CONFIG_KSU is enabled in defconfig before making defconfig
-if ! grep -q "CONFIG_KSU=y" "arch/${ARCH}/configs/${DEFCONFIG}"; then
-    echo "CONFIG_KSU=y" >> "arch/${ARCH}/configs/${DEFCONFIG}"
+# Ensure xxKSU config parameters are injected into defconfig
+CONFIG_FILE="arch/${ARCH}/configs/${DEFCONFIG}"
+if ! grep -q "CONFIG_KSU=y" "$CONFIG_FILE"; then
+    echo "CONFIG_KSU=y" >> "$CONFIG_FILE"
     echo "[+] Added CONFIG_KSU=y to ${DEFCONFIG}"
+fi
+
+if ! grep -q "CONFIG_KSU_KPROBES_KSUD=n" "$CONFIG_FILE"; then
+    echo "CONFIG_KSU_KPROBES_KSUD=n" >> "$CONFIG_FILE"
+    echo "[+] Added CONFIG_KSU_KPROBES_KSUD=n to ${DEFCONFIG}"
 fi
 
 # Make defconfig
